@@ -1,0 +1,132 @@
+package com.magiccode.teams;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.magiccode.conversation.ConversationManager;
+import com.magiccode.conversation.Message;
+import com.magiccode.conversation.ToolResultBlock;
+import com.magiccode.conversation.ToolUseBlock;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Teammate conversation transcript persistence and restoration.
+ * Serializes teammate's full conversation history to JSON files stored at
+ * .magiccode/teams/{teamName}/transcripts/{agentId}.json for debugging.
+ */
+public final class Transcript {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
+
+    private Transcript() {}
+
+    // -- Serialization data structures --
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    record TranscriptEntry(
+            @JsonProperty("role") String role,
+            @JsonProperty("content") String content,
+            @JsonProperty("tool_uses") List<TranscriptToolUse> toolUses,
+            @JsonProperty("tool_results") List<TranscriptToolResult> toolResults
+    ) {}
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    record TranscriptToolUse(
+            @JsonProperty("tool_use_id") String toolUseId,
+            @JsonProperty("tool_name") String toolName,
+            @JsonProperty("arguments") Map<String, Object> arguments
+    ) {}
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    record TranscriptToolResult(
+            @JsonProperty("tool_use_id") String toolUseId,
+            @JsonProperty("content") String content,
+            @JsonProperty("is_error") boolean isError
+    ) {}
+
+    // -- Serialization / Deserialization --
+
+    static List<TranscriptEntry> serializeConversation(ConversationManager conv) {
+        var entries = new ArrayList<TranscriptEntry>();
+        for (Message msg : conv.getMessages()) {
+            List<TranscriptToolUse> toolUses = null;
+            if (msg.getToolUses() != null && !msg.getToolUses().isEmpty()) {
+                toolUses = msg.getToolUses().stream()
+                        .map(tu -> new TranscriptToolUse(tu.toolUseId(), tu.toolName(), tu.arguments()))
+                        .toList();
+            }
+            List<TranscriptToolResult> toolResults = null;
+            if (msg.getToolResults() != null && !msg.getToolResults().isEmpty()) {
+                toolResults = msg.getToolResults().stream()
+                        .map(tr -> new TranscriptToolResult(tr.toolUseId(), tr.content(), tr.isError()))
+                        .toList();
+            }
+            entries.add(new TranscriptEntry(msg.getRole(), msg.getContent(), toolUses, toolResults));
+        }
+        return entries;
+    }
+
+    static ConversationManager deserializeConversation(List<TranscriptEntry> entries) {
+        var conv = new ConversationManager();
+        for (var e : entries) {
+            var msg = new Message(e.role(), e.content() != null ? e.content() : "");
+            if (e.toolUses() != null && !e.toolUses().isEmpty()) {
+                msg.setToolUses(e.toolUses().stream()
+                        .map(tu -> new ToolUseBlock(tu.toolUseId(), tu.toolName(), tu.arguments()))
+                        .toList());
+            }
+            if (e.toolResults() != null && !e.toolResults().isEmpty()) {
+                msg.setToolResults(e.toolResults().stream()
+                        .map(tr -> new ToolResultBlock(tr.toolUseId(), tr.content(), tr.isError()))
+                        .toList());
+            }
+            conv.getMessagesMutable().add(msg);
+        }
+        return conv;
+    }
+
+    // -- Public API --
+
+    static Path transcriptDir(String teamName) {
+        return Path.of(System.getProperty("user.dir"), ".magiccode", "teams", teamName, "transcripts");
+    }
+
+    /**
+     * Persists teammate's conversation history to disk for debugging.
+     * File path: .magiccode/teams/{team}/transcripts/{agentId}.json
+     */
+    public static Path saveTranscript(String teamName, String agentId, ConversationManager conv) throws IOException {
+        Path dir = transcriptDir(teamName);
+        Files.createDirectories(dir);
+        Path path = dir.resolve(agentId + ".json");
+        var data = serializeConversation(conv);
+        Files.writeString(path, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(data));
+        return path;
+    }
+
+    /**
+     * Loads teammate's conversation history from disk.
+     * Returns null if file doesn't exist or parsing fails.
+     */
+    public static ConversationManager loadTranscript(String teamName, String agentId) {
+        Path path = transcriptDir(teamName).resolve(agentId + ".json");
+        if (!Files.exists(path)) {
+            return null;
+        }
+        try {
+            String json = Files.readString(path);
+            var entries = MAPPER.readValue(json, new TypeReference<List<TranscriptEntry>>() {});
+            return deserializeConversation(entries);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+}

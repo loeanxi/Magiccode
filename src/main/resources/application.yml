@@ -1,0 +1,39 @@
+﻿# MagicCode 默认配置
+magiccode:
+  # LLM 提供商: anthropic | openai
+  provider: anthropic
+  
+  # Anthropic 配置
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    model: claude-3-5-sonnet-20241022
+    base-url: https://api.anthropic.com
+    
+  # OpenAI 配置
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: gpt-4o
+    base-url: https://api.openai.com
+    
+  # 远程模式配置
+  remote:
+    enabled: false
+    port: 18888
+    
+  # 会话配置
+  session:
+    max-history: 100
+    context-window: 200000
+    
+  # MCP 服务器配置
+  mcp:
+    servers: []
+    
+# Spring Boot 配置（仅远程模式使用）
+server:
+  port: ${magiccode.remote.port:18888}
+
+spring:
+  main:
+    web-application-type: servlet
+    banner-mode: off
