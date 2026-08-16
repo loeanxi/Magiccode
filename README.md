@@ -5,7 +5,7 @@
 [![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://openjdk.org/projects/jdk/21/)
 [![Build](https://img.shields.io/badge/build-133%20sources%20%2F%200%20errors-brightgreen.svg)](#构建)
 [![Tests](https://img.shields.io/badge/tests-104%20passing-brightgreen.svg)](#测试)
-[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](#许可证)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](#许可证)
 
 > 🌐 其他语言：[English](./README.md)
 
@@ -259,7 +259,7 @@ systemctl daemon-reload && systemctl enable --now magiccode
 
 ## 📜 许可证
 
-本项目当前为 **私有 / 保留所有权利（Proprietary / All rights reserved）**。若计划开源，请添加 `LICENSE` 文件（如 MIT / Apache-2.0）并更新本节。
+本项目采用 [MIT License](LICENSE)。
 
 ---
 
